@@ -1,0 +1,78 @@
+# 工作流名称
+name: Pull Docker Hub Image to GHCR
+
+# 触发方式：支持手动触发（推荐）、定时触发、代码推送触发
+on:
+  workflow_dispatch:  # 手动触发（在GitHub仓库Actions页面点击Run workflow）
+    inputs:
+      # 可手动输入要拉取的Docker Hub镜像名和标签（灵活配置）
+      source_image:
+        description: 'Docker Hub源镜像名（如nginx、mysql:8.0）'
+        required: true
+        default: 'nginx:latest'
+      # 推送到GHCR的目标镜像名（自定义）
+      target_image:
+        description: 'GHCR目标镜像名（如nginx、mysql）'
+        required: true
+        default: 'nginx'
+      # 推送到GHCR的标签
+      target_tag:
+        description: 'GHCR目标镜像标签'
+        required: true
+        default: 'latest'
+
+# 工作流执行任务
+jobs:
+  migrate-image:
+    runs-on: ubuntu-latest  # 运行环境（Ubuntu最新版）
+    permissions:
+      packages: write  # 授予操作GHCR包的权限
+      contents: read   # 读取仓库内容的权限
+
+    steps:
+      # 步骤1：设置Docker环境（确保docker命令可用）
+      - name: Set up Docker Environment
+        uses: docker/setup-buildx-action@v3
+
+      # 步骤2：登录到GHCR（核心，用于推送镜像）
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}  # 当前GitHub用户名（自动获取）
+          password: ${{ secrets.GH_TOKEN }}  # 之前配置的GH_TOKEN密钥
+
+      # 步骤3：（可选）登录到Docker Hub（拉取私有镜像时需要，公有镜像可注释）
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKER_HUB_USER }}
+          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+
+      # 步骤4：拉取Docker Hub的源镜像
+      - name: Pull Docker Hub Image
+        run: |
+          # 拉取镜像（$INPUT_SOURCE_IMAGE是手动输入的源镜像名）
+          docker pull ${{ github.event.inputs.source_image }}
+
+      # 步骤5：为镜像重新打标签（适配GHCR的命名规则）
+      - name: Tag Image for GHCR
+        run: |
+          # GHCR镜像命名规则：ghcr.io/用户名/镜像名:标签
+          docker tag \
+            ${{ github.event.inputs.source_image }} \
+            ghcr.io/jesseconfig/${{ github.event.inputs.target_image }}:${{ github.event.inputs.target_tag }}
+
+      # 步骤6：推送镜像到GHCR
+      - name: Push Image to GHCR
+        run: |
+          docker push ghcr.io/jesseconfig/${{ github.event.inputs.target_image }}:${{ github.event.inputs.target_tag }}
+
+      # 步骤7：（可选）清理本地镜像（节省空间）
+      - name: Cleanup
+        if: always()  # 无论前面步骤是否成功，都执行清理
+        run: |
+          docker rmi \
+            ${{ github.event.inputs.source_image }} \
+            ghcr.io/jesseconfig/${{ github.event.inputs.target_image }}:${{ github.event.inputs.target_tag }} || true
