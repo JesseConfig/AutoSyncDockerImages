@@ -8,8 +8,8 @@ on:
     paths:
       - 'imagelist'
   # 可选：定时触发（每天凌晨）
-  # schedule:
-  #   - cron: '0 0 * * *'
+  schedule:
+    - cron: '0 0 1 * *'
 
 jobs:
   batch-migrate-images:
