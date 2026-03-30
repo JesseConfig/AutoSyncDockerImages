@@ -3,6 +3,12 @@ nginx:latest
 mysql:8.4
 redis:7.2
 mongo:7.0
+postgres:13
+postgres:14
+#
+guacamole/guacd:latest
+guacamole/guacamole:latest
+#
 adguard/adguardhome:latest 
 c4illin/convertx:latest 
 drakkan/sftpgo:v2.7.0-alpine 
